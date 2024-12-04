@@ -4,7 +4,15 @@ from pymysql import connect
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import razorpay
+
+
+razorpay_key_id = "rzp_test_NPLt5VjCndRODB"
+razorpay_key_secret = "rxsB75adQBQWLiQhycBqR9Cp"
+client = razorpay.Client(auth=(razorpay_key_id,razorpay_key_secret))
+
 verifyotp ="0"
+
 
 db_config = {
     'host' : 'localhost',
@@ -164,12 +172,34 @@ def cartpage():
         subtotal = 0
         for i in row:
             subtotal = subtotal +int(i[4])
-        
+        result = subtotal * 100
+        order = client.order.create({
+            'amount' : result,
+            'currency' : 'INR',
+            'payment_capture' : '1'
+        })   
     except:
         return "Error occured while Retreving the data"
     else:
-        return render_template("cart.html",data=row,grandtotal=subtotal)
-    
+        return render_template("cart.html",data=row,grandtotal=subtotal,order=order)
+
+
+@app.route("/sucess",methods = ["POST","GET"])
+def sucess():
+    payment_id = request.form.get("razorpay_payment_id")
+    order_id = request.form.get("razorpay_order_id")
+    signature = request.form.get("razorpay_signature")
+    dict1 = {
+        'razorpay_order_id' : order_id,
+        'razorpay_payment_id' : payment_id,
+        'razorpay_signature' : signature
+    }
+    try:
+        client.utility.verify_payment_signature(dict1)
+        return render_template("success.html")
+    except:
+        return render_template("failed.html")
+
 
 if __name__ == "__main__":
     app.run()
